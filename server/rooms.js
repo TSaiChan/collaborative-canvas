@@ -66,7 +66,7 @@ class DrawingRoom {
         const clientInfo = {
             userId,           // Unique ID
             username,         // Display name
-            color,            // Their color for identification
+            color: assignedColor,  // Their color for identification (FIXED: was 'color' undefined)
             joinedAt: Date.now(),
             lastActivityAt: Date.now(),
             isActive: true

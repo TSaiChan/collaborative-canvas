@@ -95,28 +95,32 @@ class DrawingState {
      * @returns {boolean} - True if successfully undone
      */
     recordUndo(undoOp) {
-        // Find the operation to remove by its ID
-        const operationIndex = this.drawingHistory.findIndex(
-            op => op.id === undoOp.operationId
-        );
-
-        // If operation not found, undo failed
-        if (operationIndex === -1) {
-            console.warn('Undo failed - operation not found:', undoOp.operationId);
+        // Check if there's anything to undo
+        if (this.operationStack.length === 0) {
+            console.warn('Undo failed - nothing to undo');
             return false;
         }
 
-        // Remove the operation from history
-        const removedOperation = this.drawingHistory.splice(operationIndex, 1)[0];
+        // Remove the last operation from stack
+        const removedOperation = this.operationStack.pop();
 
         // Keep removed operation in case user wants to redo
         this.redoStack.push(removedOperation);
 
+        // Also remove from drawing history if present
+        const historyIndex = this.drawingHistory.findIndex(
+            op => op.operationId === removedOperation.operationId
+        );
+
+        if (historyIndex !== -1) {
+            this.drawingHistory.splice(historyIndex, 1);
+        }
+
         // Record this undo action in audit trail
         this.operationHistory.push({
             type: 'UNDO',
-            ...undoOp,
-            removedOperationId: undoOp.operationId,
+            userId: undoOp.userId,
+            removedOperationId: removedOperation.operationId,
             timestamp: Date.now()
         });
 
@@ -141,14 +145,17 @@ class DrawingState {
         // Get the operation to restore
         const operation = this.redoStack.pop();
 
-        // Add it back to the drawing history
+        // Add it back to the operation stack
+        this.operationStack.push(operation);
+
+        // Add it back to drawing history
         this.drawingHistory.push(operation);
 
         // Record this redo action in audit trail
         this.operationHistory.push({
             type: 'REDO',
-            ...redoOp,
-            readdedOperationId: operation.id,
+            userId: redoOp.userId,
+            readdedOperationId: operation.operationId,
             timestamp: Date.now()
         });
 
