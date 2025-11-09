@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative Drawing Canvas</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">🎨 Collaborative Canvas</h1>
+                <div class="header-stats">
+                    <span class="stat-item">
+                        <span class="stat-label">Users Online:</span>
+                        <span class="stat-value" id="userCount">0</span>
+                    </span>
+                    <span class="stat-item">
+                        <span class="stat-label">Room:</span>
+                        <span class="stat-value" id="roomId">default</span>
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <!-- Sidebar: Tools -->
+            <aside class="sidebar-left">
+                <div class="tools-section">
+                    <h3 class="section-title">🛠️ Drawing Tools</h3>
+
+                    <div class="tool-group">
+                        <label class="tool-label">Tool</label>
+                        <div class="tool-buttons">
+                            <button class="tool-btn active" data-tool="brush" title="Brush (B)">
+                                <span class="tool-icon">✏️</span>
+                                <span class="tool-name">Brush</span>
+                            </button>
+                            <button class="tool-btn" data-tool="eraser" title="Eraser (E)">
+                                <span class="tool-icon">🧹</span>
+                                <span class="tool-name">Eraser</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="tool-group">
+                        <label class="tool-label">Color</label>
+                        <div class="color-picker-wrapper">
+                            <input type="color" id="colorPicker" value="#000000" class="color-input">
+                            <span class="color-preview" id="colorPreview"></span>
+                        </div>
+                        <div class="preset-colors">
+                            <button class="color-preset" style="background: #000000;" data-color="#000000"></button>
+                            <button class="color-preset" style="background: #FF0000;" data-color="#FF0000"></button>
+                            <button class="color-preset" style="background: #00FF00;" data-color="#00FF00"></button>
+                            <button class="color-preset" style="background: #0000FF;" data-color="#0000FF"></button>
+                            <button class="color-preset" style="background: #FFFF00;" data-color="#FFFF00"></button>
+                            <button class="color-preset" style="background: #FF00FF;" data-color="#FF00FF"></button>
+                        </div>
+                    </div>
+
+                    <div class="tool-group">
+                        <label for="brushSize" class="tool-label">Brush Size</label>
+                        <input type="range" id="brushSize" min="1" max="50" value="3" class="slider">
+                        <span class="size-display" id="sizeDisplay">3px</span>
+                    </div>
+
+                    <div class="tool-group">
+                        <label for="eraserSize" class="tool-label">Eraser Size</label>
+                        <input type="range" id="eraserSize" min="5" max="80" value="20" class="slider">
+                        <span class="size-display" id="eraserDisplay">20px</span>
+                    </div>
+                </div>
+
+                <!-- History Section -->
+                <div class="history-section">
+                    <h3 class="section-title">📚 History</h3>
+                    <div class="history-buttons">
+                        <button id="undoBtn" class="action-btn undo-btn" title="Undo (Ctrl+Z)">
+                            <span class="btn-icon">↶</span>
+                            <span class="btn-text">Undo</span>
+                        </button>
+                        <button id="redoBtn" class="action-btn redo-btn" title="Redo (Ctrl+Y)">
+                            <span class="btn-icon">↷</span>
+                            <span class="btn-text">Redo</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Clear Canvas -->
+                <div class="clear-section">
+                    <button id="clearBtn" class="action-btn clear-btn danger" title="Clear entire canvas">
+                        <span class="btn-icon">🗑️</span>
+                        <span class="btn-text">Clear Canvas</span>
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Canvas Area -->
+            <section class="canvas-section">
+                <div class="canvas-wrapper">
+                    <canvas id="drawingCanvas" class="drawing-canvas"></canvas>
+                    <div class="cursor-indicators" id="cursorIndicators"></div>
+                </div>
+                <div class="canvas-footer">
+                    <p class="footer-text">Start drawing! Your strokes sync in real-time.</p>
+                </div>
+            </section>
+
+            <!-- Sidebar: Users -->
+            <aside class="sidebar-right">
+                <div class="users-section">
+                    <h3 class="section-title">👥 Active Users</h3>
+                    <div class="users-list" id="usersList">
+                        <p class="empty-state">Waiting for users...</p>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3 class="section-title">ℹ️ Information</h3>
+                    <div class="info-content">
+                        <p class="info-text">
+                            <strong>Your ID:</strong><br>
+                            <span id="myUserId" class="user-id-text">Loading...</span>
+                        </p>
+                        <p class="info-text">
+                            <strong>Connection Status:</strong><br>
+                            <span id="connectionStatus" class="status-badge status-connecting">Connecting...</span>
+                        </p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Join Room Modal -->
+    <div id="roomModal" class="modal">
+        <div class="modal-content">
+            <h2>Join Collaborative Canvas</h2>
+            <form id="roomForm">
+                <div class="form-group">
+                    <label for="roomInput">Room ID (leave empty for 'default'):</label>
+                    <input type="text" id="roomInput" placeholder="room-name" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="usernameInput">Your Name:</label>
+                    <input type="text" id="usernameInput" placeholder="Enter your name" class="form-input" required>
+                </div>
+                <button type="submit" class="form-btn">Join Canvas</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="websocket.js"></script>
+    <script src="canvas.js"></script>
+    <script src="main.js"></script>
+</body>
+
+</html>
