@@ -48,15 +48,23 @@ class WebSocketManager {
      * Connect to the WebSocket server
      * 
      * Returns a Promise so caller can wait for connection to establish.
+     * Automatically detects protocol (ws:// or wss://) based on current page
      * 
-     * @param {string} url - Server URL (e.g., 'ws://localhost:3000')
      * @returns {Promise} - Resolves when connected, rejects if fails
      */
-    connect(url = `ws://${window.location.host}`) {
+    connect() {
         return new Promise((resolve, reject) => {
             try {
+                // Determine correct WebSocket protocol based on page protocol
+                // If page is HTTPS, use WSS (secure WebSocket)
+                // If page is HTTP, use WS (plain WebSocket)
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}`;
+
+                console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
+
                 // Create WebSocket connection
-                this.ws = new WebSocket(url);
+                this.ws = new WebSocket(wsUrl);
 
                 /**
                  * Connection opened successfully
@@ -83,6 +91,8 @@ class WebSocketManager {
                         // Parse JSON message
                         const data = JSON.parse(event.data);
 
+                        console.log(`📨 Received message: ${data.type}`);
+
                         // Route to appropriate handler
                         this.handleMessage(data);
                     } catch (error) {
@@ -94,9 +104,10 @@ class WebSocketManager {
                  * WebSocket error occurred
                  */
                 this.ws.onerror = (error) => {
-                    console.error('WebSocket error:', error);
-                    this.emit('ERROR', error);
-                    reject(error);
+                    console.error('❌ WebSocket error:', error);
+                    this.isConnected = false;
+                    this.emit('CONNECTION_FAILED', error.message);
+                    reject(new Error('WebSocket connection error'));
                 };
 
                 /**
@@ -113,6 +124,7 @@ class WebSocketManager {
 
             } catch (error) {
                 console.error('Error creating WebSocket:', error);
+                this.emit('CONNECTION_FAILED', error.message);
                 reject(error);
             }
         });
@@ -122,6 +134,7 @@ class WebSocketManager {
      * Try to reconnect to server
      * 
      * Implements exponential backoff - waits longer between attempts.
+     * Max 5 attempts with delays: 3s, 3s, 3s, 3s, 3s
      */
     attemptReconnect() {
         // Have we tried too many times?
@@ -130,7 +143,7 @@ class WebSocketManager {
             this.reconnectAttempts++;
 
             console.log(
-                `→ Attempting reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
+                `🔄 Attempting reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
             );
 
             // Tell UI we're reconnecting
@@ -146,8 +159,8 @@ class WebSocketManager {
 
         } else {
             // Give up after max attempts
-            console.error('✗ Max reconnection attempts reached');
-            this.emit('CONNECTION_FAILED');
+            console.error('❌ Max reconnection attempts reached');
+            this.emit('CONNECTION_FAILED', 'Max reconnection attempts reached');
         }
     }
 
@@ -160,10 +173,15 @@ class WebSocketManager {
      */
     send(data) {
         // Only send if connected
-        if (this.isConnected && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify(data));
+        if (this.isConnected && this.ws && this.ws.readyState === WebSocket.OPEN) {
+            try {
+                this.ws.send(JSON.stringify(data));
+                console.log(`📤 Sent: ${data.type}`);
+            } catch (error) {
+                console.error('Error sending message:', error);
+            }
         } else {
-            console.warn('WebSocket not connected, message not sent:', data);
+            console.warn('⚠️  WebSocket not connected, message not sent:', data.type);
         }
     }
 
@@ -176,6 +194,8 @@ class WebSocketManager {
     joinRoom(roomId = 'default', username = 'User') {
         this.currentRoom = roomId;
         this.username = username;
+
+        console.log(`Joining room: "${roomId}" as "${username}"`);
 
         // Send join request to server
         this.send({
@@ -320,7 +340,11 @@ class WebSocketManager {
 
         if (handler) {
             // Call the handler function
-            handler(data);
+            try {
+                handler(data);
+            } catch (error) {
+                console.error(`Error in handler for ${data.type}:`, error);
+            }
         } else {
             // No specific handler, emit as generic event
             this.emit(data.type, data);
@@ -394,6 +418,7 @@ class WebSocketManager {
         if (this.ws) {
             this.ws.close();
             this.isConnected = false;
+            console.log('Disconnected from WebSocket');
         }
     }
 
