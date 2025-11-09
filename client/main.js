@@ -102,6 +102,7 @@ class DrawingApp {
             await this.ws.connect();
         } catch (error) {
             console.error('Failed to connect:', error);
+            alert('Failed to connect to server. Please refresh the page.');
             return;
         }
 
@@ -150,7 +151,8 @@ class DrawingApp {
             this.userId = data.userInfo.userId;
 
             // Show our ID in UI
-            document.getElementById('myUserId').textContent = this.userId;
+            const myUserIdEl = document.getElementById('myUserId');
+            if (myUserIdEl) myUserIdEl.textContent = this.userId;
 
             console.log('✓ History loaded');
         });
@@ -167,8 +169,11 @@ class DrawingApp {
             this.updateUsersList(data.users);
 
             // Update user count
-            document.getElementById('userCount').textContent = data.clientCount;
-            document.getElementById('roomId').textContent = this.ws.currentRoom;
+            const userCountEl = document.getElementById('userCount');
+            if (userCountEl) userCountEl.textContent = data.clientCount;
+
+            const roomIdEl = document.getElementById('roomId');
+            if (roomIdEl) roomIdEl.textContent = this.ws.currentRoom;
         });
 
         /**
@@ -181,7 +186,8 @@ class DrawingApp {
             this.updateUsersList(data.users);
 
             // Update count
-            document.getElementById('userCount').textContent = data.clientCount;
+            const userCountEl = document.getElementById('userCount');
+            if (userCountEl) userCountEl.textContent = data.clientCount;
         });
 
         // ===== REMOTE DRAWING =====
@@ -230,6 +236,26 @@ class DrawingApp {
                 this.canvas.drawingStates = [];
                 this.canvas.currentStateIndex = -1;
                 this.canvas.saveState();
+            }
+        });
+
+        // ===== UNDO/REDO =====
+
+        /**
+         * Someone pressed undo
+         */
+        this.ws.on('UNDO', (data) => {
+            if (data.userId !== this.userId) {
+                this.canvas.remoteUndo();
+            }
+        });
+
+        /**
+         * Someone pressed redo
+         */
+        this.ws.on('REDO', (data) => {
+            if (data.userId !== this.userId) {
+                this.canvas.remoteRedo();
             }
         });
 
@@ -302,29 +328,31 @@ class DrawingApp {
         const colorPicker = document.getElementById('colorPicker');
         const colorPreview = document.getElementById('colorPreview');
 
-        colorPicker.addEventListener('change', (e) => {
-            const color = e.target.value;
-            this.canvas.setColor(color);
-            colorPreview.style.background = color;
-        });
-
-        /**
-         * User clicked a preset color
-         */
-        document.querySelectorAll('.color-preset').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const color = btn.dataset.color;
-
-                // Update color picker
-                colorPicker.value = color;
-
-                // Update canvas
+        if (colorPicker && colorPreview) {
+            colorPicker.addEventListener('change', (e) => {
+                const color = e.target.value;
                 this.canvas.setColor(color);
-
-                // Update preview
                 colorPreview.style.background = color;
             });
-        });
+
+            /**
+             * User clicked a preset color
+             */
+            document.querySelectorAll('.color-preset').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const color = btn.dataset.color;
+
+                    // Update color picker
+                    colorPicker.value = color;
+
+                    // Update canvas
+                    this.canvas.setColor(color);
+
+                    // Update preview
+                    colorPreview.style.background = color;
+                });
+            });
+        }
 
         // ===== BRUSH SIZE =====
 
@@ -332,10 +360,13 @@ class DrawingApp {
          * User moved brush size slider
          */
         const brushSizeInput = document.getElementById('brushSize');
-        brushSizeInput.addEventListener('input', (e) => {
-            this.canvas.setBrushSize(e.target.value);
-            document.getElementById('sizeDisplay').textContent = `${e.target.value}px`;
-        });
+        if (brushSizeInput) {
+            brushSizeInput.addEventListener('input', (e) => {
+                this.canvas.setBrushSize(e.target.value);
+                const sizeDisplay = document.getElementById('sizeDisplay');
+                if (sizeDisplay) sizeDisplay.textContent = `${e.target.value}px`;
+            });
+        }
 
         // ===== ERASER SIZE =====
 
@@ -343,45 +374,57 @@ class DrawingApp {
          * User moved eraser size slider
          */
         const eraserSizeInput = document.getElementById('eraserSize');
-        eraserSizeInput.addEventListener('input', (e) => {
-            this.canvas.setEraserSize(e.target.value);
-            document.getElementById('eraserDisplay').textContent = `${e.target.value}px`;
-        });
+        if (eraserSizeInput) {
+            eraserSizeInput.addEventListener('input', (e) => {
+                this.canvas.setEraserSize(e.target.value);
+                const eraserDisplay = document.getElementById('eraserDisplay');
+                if (eraserDisplay) eraserDisplay.textContent = `${e.target.value}px`;
+            });
+        }
 
         // ===== UNDO/REDO BUTTONS =====
 
         /**
          * User clicked Undo button
          */
-        document.getElementById('undoBtn').addEventListener('click', () => {
-            const stateIndex = this.canvas.undo();
-            if (stateIndex >= 0) {
-                this.ws.sendUndo(this.userId, stateIndex);
-            }
-        });
+        const undoBtn = document.getElementById('undoBtn');
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => {
+                const stateIndex = this.canvas.undo();
+                if (stateIndex >= 0) {
+                    this.ws.sendUndo(this.userId, stateIndex);
+                }
+            });
+        }
 
         /**
          * User clicked Redo button
          */
-        document.getElementById('redoBtn').addEventListener('click', () => {
-            const stateIndex = this.canvas.redo();
-            if (stateIndex >= 0) {
-                this.ws.sendRedo(this.userId, stateIndex);
-            }
-        });
+        const redoBtn = document.getElementById('redoBtn');
+        if (redoBtn) {
+            redoBtn.addEventListener('click', () => {
+                const stateIndex = this.canvas.redo();
+                if (stateIndex >= 0) {
+                    this.ws.sendRedo(this.userId, stateIndex);
+                }
+            });
+        }
 
         // ===== CLEAR CANVAS =====
 
         /**
          * User clicked Clear Canvas button
          */
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            // Ask for confirmation (it can't be undone server-side)
-            if (confirm('Clear canvas? Everyone will see the change.')) {
-                this.canvas.clearCanvas();
-                this.ws.sendClearCanvas(this.userId);
-            }
-        });
+        const clearBtn = document.getElementById('clearBtn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                // Ask for confirmation (it can't be undone server-side)
+                if (confirm('Clear canvas? Everyone will see the change.')) {
+                    this.canvas.clearCanvas();
+                    this.ws.sendClearCanvas(this.userId);
+                }
+            });
+        }
 
         // ===== MOUSE TRACKING =====
 
@@ -480,12 +523,14 @@ class DrawingApp {
 
             // ===== BRUSH: Press B =====
             if (e.key === 'b' || e.key === 'B') {
-                document.querySelector('[data-tool="brush"]').click();
+                const brushBtn = document.querySelector('[data-tool="brush"]');
+                if (brushBtn) brushBtn.click();
             }
 
             // ===== ERASER: Press E =====
             if (e.key === 'e' || e.key === 'E') {
-                document.querySelector('[data-tool="eraser"]').click();
+                const eraserBtn = document.querySelector('[data-tool="eraser"]');
+                if (eraserBtn) eraserBtn.click();
             }
         });
     }
@@ -497,6 +542,8 @@ class DrawingApp {
      */
     updateUsersList(users) {
         const usersList = document.getElementById('usersList');
+
+        if (!usersList) return;
 
         // Clear current list
         usersList.innerHTML = '';
@@ -560,6 +607,8 @@ class DrawingApp {
         // Get container for cursor indicators
         const indicators = document.getElementById('cursorIndicators');
 
+        if (!indicators) return;
+
         // Look for existing cursor for this user
         let cursor = document.getElementById(`cursor-${userId}`);
 
@@ -589,7 +638,6 @@ class DrawingApp {
         cursor.style.opacity = '1';
 
         // Hide cursor after 1 second of inactivity
-        // (so it disappears when user stops moving mouse)
         cursor.hideTimeout = setTimeout(() => {
             cursor.style.opacity = '0.3';
         }, 1000);
@@ -602,7 +650,9 @@ class DrawingApp {
         // Initialize color preview
         const colorPicker = document.getElementById('colorPicker');
         const colorPreview = document.getElementById('colorPreview');
-        colorPreview.style.background = colorPicker.value;
+        if (colorPicker && colorPreview) {
+            colorPreview.style.background = colorPicker.value;
+        }
     }
 }
 

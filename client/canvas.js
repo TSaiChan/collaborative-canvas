@@ -164,6 +164,7 @@ class CanvasManager {
     handleMouseLeave(e) {
         if (this.isDrawing) {
             this.isDrawing = false;
+            this.saveState();
         }
     }
 
@@ -370,7 +371,6 @@ class CanvasManager {
      */
     saveState() {
         // If we're not at the end of history, remove everything after current point
-        // (This is what happens when you undo and then do something new)
         if (this.currentStateIndex < this.drawingStates.length - 1) {
             this.drawingStates = this.drawingStates.slice(0, this.currentStateIndex + 1);
         }
@@ -379,12 +379,10 @@ class CanvasManager {
         if (this.drawingStates.length >= this.maxHistoryStates) {
             this.drawingStates.shift();
         } else {
-            // We're adding a new state, so move index forward
             this.currentStateIndex++;
         }
 
         // Take a snapshot of current canvas and save it
-        // (This is a data URL - a string representation of the image)
         this.drawingStates.push(this.canvas.toDataURL());
 
         // Update UI buttons (enable/disable undo/redo)
@@ -437,6 +435,28 @@ class CanvasManager {
 
         // Can't redo
         return -1;
+    }
+
+    /**
+     * Remote undo - when another user undoes
+     */
+    remoteUndo() {
+        if (this.currentStateIndex > 0) {
+            this.currentStateIndex--;
+            this.restoreState(this.currentStateIndex);
+            this.updateUndoRedoButtons();
+        }
+    }
+
+    /**
+     * Remote redo - when another user redoes
+     */
+    remoteRedo() {
+        if (this.currentStateIndex < this.drawingStates.length - 1) {
+            this.currentStateIndex++;
+            this.restoreState(this.currentStateIndex);
+            this.updateUndoRedoButtons();
+        }
     }
 
     /**
